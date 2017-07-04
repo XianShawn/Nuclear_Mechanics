@@ -1,0 +1,122 @@
+%calculation of elasticity using linearization method
+%this will calculate the elasticity part for different speeds
+
+% v = 30 45 60 for wild type whole cells
+% v = 15 30 45 for drug treated cells or isolated nucleus
+
+% the elasticity is finically calculated by fitting after linearization
+% the three different speeds data can be fitted separately and you will get
+% the elasticity for different speeds separately
+
+% dF_1 dF_2 dF_3 are for different speeds
+%% clear
+clear all;
+close all
+clearvars -global
+
+% intialization
+
+pa = 'C:\Users\amnl\Desktop\Xian\matlab_code\analyze_data_indent';
+
+global select_extend1_withdraw2     %
+global re_select_roi_N0_L1_C2       % -1 auto, 2 manul 
+global show_figure_on1_off0
+show_figure_on1_off0=1
+
+re_select_roi_N0_L1_C2=2            % set everything manul
+InMain_select_extend1_withdraw2=2   
+
+select_extend1_withdraw2=InMain_select_extend1_withdraw2
+
+% set parameters for both tip and sample
+para.indent_data_length=1024;  % length of indent length
+para.R = 50                    % tip radius of the probe, in nanoNewton
+para.v_sample=0.5;            % posion ratio of the sample
+para.L_sample=0.000003;       % the thickness of the sample
+
+para.v_tip=0.5;               % consider the conflict of both tip and sample
+para.E_tip=135;               %Gpa  
+para.u = 0.000030;
+
+
+%% plot previous result
+
+% load the elasticity values of different speeds
+
+%cd 'C:\Users\amnl\Desktop\Xian\matlab_code\analyze_data_indent\matlab_data_nucleus_RT4'
+%cd 'C:\Users\amnl\Desktop\Xian\matlab_code\analyze_data_indent\matlab_data_T24'
+% cd 'C:\Users\amnl\Desktop\Xian\matlab_code\analyze_data_indent\matlab_data_RT4'
+cd 'C:\Users\amnl\Desktop\Xian\matlab_code\analyze_data_indent\test'
+
+i = 1; % difine the spot to load
+% load the file separately and save Esmaple to matrix E
+load(['spot' num2str(i) '_v30.mat']);  % v = 30/15 
+E_single(1) = youngs.Esample;
+distance_1 = youngs.sDisplacement - min(youngs.sDisplacement);
+force_1 = youngs.sForce - min(youngs.sForce); 
+cfL_youngs1 = youngs.cfL;
+
+load(['spot' num2str(i) '_v45.mat']);   % v = 45/30
+E_single(2) = youngs.Esample;
+distance_2 = youngs.sDisplacement - min(youngs.sDisplacement);
+force_2 = youngs.sForce - min(youngs.sForce); 
+cfL_youngs2 = youngs.cfL;
+
+load(['spot' num2str(i) '_v60.mat']);   % v = 60/45
+E_single(3) = youngs.Esample;
+distance_3 = youngs.sDisplacement - min(youngs.sDisplacement);
+force_3 = youngs.sForce - min(youngs.sForce); 
+cfL_youngs3 = youngs.cfL;
+
+figure(1)
+bar(E_single, 0.5);
+title(i);
+
+cd ..
+
+%% pre-process of the data 
+% curve fitting and sampling
+len = min(max(distance_1),max(distance_2))
+len = min(len, max(distance_3))
+mid = 0:0.01:len;
+
+[cfL_1, gof_1] = createFit_gaussian(distance_1, force_1);
+for_1=feval(cfL_1,mid);
+[cfL_2, gof_2] = createFit_gaussian(distance_2,force_2);
+for_2=feval(cfL_2,mid);
+[cfL_3, gof_3] = createFit_gaussian(distance_3,force_3);
+for_3=feval(cfL_3,mid);
+
+dF_1 = diff(for_1)/0.1;
+dF_2 = diff(for_2)/0.1;
+dF_3 = diff(for_3)/0.1;
+mid_update = mid(1:end-1).^0.5;
+
+%% select select indentation roi, this ROI will be used to calculate Young's modulus
+
+% change from dF_1, dF_2, dF_3 for the three speeds in fitting
+[sDis,sFor,ind]=manual_select_line_roi(mid_update,dF_3,'select indentation roi');
+[cfL_elasticity,gofR2] = createFit_line_poly_N(sDis, sFor, 1);
+
+K = cfL_elasticity.p1;
+E = 0.5*K/sqrt(para.R)
+
+%% save elasticity
+    elasticity.E = E;
+    elasticity.cfL = cfL_elasticity;
+    elasticity.distance = sDis;
+    elasticity.force = sFor;
+    elasticity.mid = mid_update;
+    
+%     % save to RT4
+%     disp('saving to RT4');
+%     save([ pwd '\matlab_elas_RT4\' 'elasticity_'  num2str(i) '_60'   '.mat'], 'elasticity');
+     
+%     % save to T24
+%     disp('saving to T24');
+%     save([ pwd '\matlab_elas_T24\' 'elasticity_'  num2str(i) '_30'   '.mat'], 'elasticity');
+   
+
+    % save to RT4 nucleus, change the speed values 30 45 60 or 15 30 45
+    disp('saving to RT4 nucleus');
+    save([ pwd '\matlab_elas_RT4\' 'elasticity_'  num2str(i) '_60'   '.mat'], 'elasticity');
